@@ -78,10 +78,10 @@ Available characters (v0.2.X):
 
 - ⬜ Implement sound effects and music.
 
-- ⬜ Menus
+- ⬜ (35%) Menus
 - - ✅ Create pause menu with Resume option and return to character select.
-- - ⬜ Create main screen with Start Game and Options.
-- - ⬜ In Start Game we should have Single and Multiplayer options.
+- - ✅ Create main screen with Start Game and Options.
+- - ✅ In Start Game we should have Single and Multiplayer options.
 - - ✅ Create character selection menu.
 - - ⬜ In Options we should have Joystick Map and Audio Settings.
 - - ⬜ In Options->Joystick Map we should have button remapping option.
@@ -94,6 +94,8 @@ Available characters (v0.2.X):
 - ⬜ Player 2.
 - - ⬜ Detect when controller 2 is connected.
 - - ⬜ Show P2 character indicator in character select screen.
+
+- ⬜ Battle mechanics with stun, knockback, pulse, and damage.
 
 - ⬜ Assign characters to specific locations on the map using the Map Editor (only P1/P2 is currently working).
 - ⬜ Camera control.

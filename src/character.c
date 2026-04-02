@@ -860,8 +860,7 @@ void    character_draw(void)
 
     if (character_frame_id != -1)
     {
-        int frame_width = character_get_frame_width(selected_row, selected_frame);
-    int draw_x = player.x - CHARACTER_FRAME_MAX_WIDTH / 2;
+        int draw_x = player.x - ((CHARACTER_FRAME_MAX_WIDTH - SONIC_WIDTH) / 2);
         if (player.flip_sonic)
             jo_sprite_enable_horizontal_flip();
 

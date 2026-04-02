@@ -49,6 +49,9 @@ static int map_pos_x = WORLD_DEFAULT_X;
 static int map_pos_y = WORLD_DEFAULT_Y;
 
 static bool is_boot_screen = true;
+static bool is_main_menu = false;
+static bool is_start_game_menu = false;
+static bool is_options_menu = false;
 static bool is_character_select = false;
 static bool is_character_test = false;
 static bool is_game_paused = false;
@@ -60,6 +63,12 @@ static bool map_tiles_loaded = false;
 static bool map_content_loaded = false;
 static bool character_test_store_active = false;
 static bool character_test_action_pending = false;
+static bool is_multiplayer_mode = false;
+static int  main_menu_idx = 0;
+static int  start_game_menu_idx = 0;
+static int  character_select_active_player = 1; // 1 = P1, 2 = P2 in multiplayer
+static int  selected_character_p1 = CHARACTER_SONIC;
+static int  selected_character_p2 = CHARACTER_AMY;
 static jo_img cached_menu_background = {JO_TV_WIDTH, JO_TV_HEIGHT, JO_NULL};
 static bool cached_menu_background_valid = false;
 static jo_img saved_game_background = {JO_TV_WIDTH, JO_TV_HEIGHT, JO_NULL};
@@ -233,17 +242,67 @@ static const char * const character_name[CHARACTER_COUNT] =
     "Tails"
 };
 
+static inline void     draw_main_menu(void)
+{
+    int lines[] = {8, 9, 10, 11, 12};
+    clear_text_lines(lines, 5);
+
+    draw_text(8, 8, "Main Menu");
+    draw_text(8, 10, "%s Start Game", main_menu_idx == 0 ? ">" : " ");
+    draw_text(8, 11, "%s Options", main_menu_idx == 1 ? ">" : " ");
+}
+
+static inline void     draw_start_game_menu(void)
+{
+    int lines[] = {8, 9, 10, 11, 12};
+    clear_text_lines(lines, 5);
+
+    draw_text(8, 8, "Start Game");
+    draw_text(8, 10, "%s Single Player", start_game_menu_idx == 0 ? ">" : " ");
+    draw_text(8, 11, "%s Multiplayer", start_game_menu_idx == 1 ? ">" : " ");
+    draw_text(8, 13, "Use A to confirm");
+}
+
 static inline void     draw_character_select(void)
 {
-    int lines[] = {8, 9, 10, 11, 12, 13, 14, 15, 16};
-    clear_text_lines(lines, 9);
+    const int base_line = 8;
 
-    draw_text(8, 8, "Select your character:");
-    for (int i = 0; i < CHARACTER_COUNT; ++i)
+    if (is_multiplayer_mode)
     {
-        draw_text(8, 10 + i, "%s %s", i == selected_character ? ">" : " ", character_name[i]);
+        int lines[] = {8, 9, 10, 11, 12, 13, 14, 15, 16, 17};
+        clear_text_lines(lines, 10);
+
+        draw_text(8, base_line, "Character Select (Multiplayer)");
+        for (int i = 0; i < CHARACTER_COUNT; ++i)
+        {
+            const char *tag = "   ";
+            if (selected_character_p1 == i)
+                tag = "P1 ";
+            if (selected_character_p2 == i)
+                tag = "P2 ";
+            if (selected_character_p1 == i && selected_character_p2 == i)
+                tag = "P1P2";
+
+            draw_text(8, base_line + 1 + i, "%s %s", tag, character_name[i]);
+        }
+
+        draw_text(8, base_line + 6, "P% d selected: %s", character_select_active_player, character_name[(character_select_active_player == 1) ? selected_character_p1 : selected_character_p2]);
+        draw_text(8, base_line + 7, "UP/DOWN: switch P1/P2  L/R: choose char");
+        draw_text(8, base_line + 8, "A: confirm  B: back");
     }
-    draw_text(8, 16, "A: game  START: test screen");
+    else
+    {
+        int lines[] = {8, 9, 10, 11, 12, 13, 14};
+        clear_text_lines(lines, 7);
+
+        draw_text(8, base_line, "Character Select (Single)");
+        for (int i = 0; i < CHARACTER_COUNT; ++i)
+        {
+            draw_text(8, base_line + 1 + i, "%s %s", i == selected_character ? ">" : " ", character_name[i]);
+        }
+
+        draw_text(8, base_line + 6, "LEFT/RIGHT: change char  A: start  B: back");
+    }
 }
 
 static inline void     draw_character_test_screen(void)
@@ -428,6 +487,27 @@ static inline void     my_draw(void)
         return;
     }
 
+    if (is_main_menu)
+    {
+        draw_main_menu();
+        return;
+    }
+
+    if (is_start_game_menu)
+    {
+        draw_start_game_menu();
+        return;
+    }
+
+    if (is_options_menu)
+    {
+        int lines[] = {8, 9, 10, 11};
+        clear_text_lines(lines, 4);
+        draw_text(8, 8, "Options menu (placeholder)");
+        draw_text(8, 10, "B: Back");
+        return;
+    }
+
     if (is_character_select)
     {
         draw_character_select();
@@ -523,10 +603,9 @@ static inline void     my_input(void)
 
             ram_cart_defocus_boot_text();
             is_boot_screen = false;
-            is_character_select = true;
+            is_main_menu = true;
             load_menu_background();
-            selected_character = CHARACTER_SONIC;
-            character_choose(selected_character);
+            main_menu_idx = 0;
         }
 
         last_up = up;
@@ -538,35 +617,26 @@ static inline void     my_input(void)
         return;
     }
 
-    if (is_character_select)
+    if (is_main_menu)
     {
-        if (left_edge)
+        if (up_edge)
+            main_menu_idx = (main_menu_idx + 1) % 2;
+        else if (down_edge)
+            main_menu_idx = (main_menu_idx + 1) % 2;
+
+        if (a_edge)
         {
-            selected_character = (selected_character + CHARACTER_COUNT - 1) % CHARACTER_COUNT;
-            character_choose(selected_character);
-            /* apenas seleção de texto, sem pré-carregar tiles da fase */
-        }
-        else if (right_edge)
-        {
-            selected_character = (selected_character + 1) % CHARACTER_COUNT;
-            character_choose(selected_character);
-            /* apenas seleção de texto, sem pré-carregar tiles da fase */
-        }
-        else if (a_edge)
-        {
-            int lines[] = {8, 9, 10, 11, 12, 13, 14, 15, 16};
-            clear_text_lines(lines, 9);
-            is_character_select = false;
-            is_game_paused = false;
-            game_started = false;
-            pending_resume_sprite_refresh = false;
-            if (!cache_game_background() && show_debug_overlay)
-                draw_text(0, 20, "[SONIC] ERRO: Nao foi possivel carregar BG.TGA");
-            loading_phase = 1;
-        }
-        else if (start_edge)
-        {
-            enter_character_test_screen();
+            if (main_menu_idx == 0)
+            {
+                is_main_menu = false;
+                is_start_game_menu = true;
+                start_game_menu_idx = 0;
+            }
+            else
+            {
+                // Options menu not implemented yet
+                is_options_menu = true;
+            }
         }
 
         last_up = up;
@@ -574,6 +644,132 @@ static inline void     my_input(void)
         last_left = left;
         last_right = right;
         last_a = a;
+        last_start = start;
+        return;
+    }
+
+    if (is_start_game_menu)
+    {
+        if (up_edge)
+            start_game_menu_idx = (start_game_menu_idx + 1) % 2;
+        else if (down_edge)
+            start_game_menu_idx = (start_game_menu_idx + 1) % 2;
+
+        if (a_edge)
+        {
+            is_start_game_menu = false;
+            is_character_select = true;
+            if (start_game_menu_idx == 0)
+            {
+                is_multiplayer_mode = false;
+                selected_character = CHARACTER_SONIC;
+            }
+            else
+            {
+                is_multiplayer_mode = true;
+                selected_character_p1 = CHARACTER_SONIC;
+                selected_character_p2 = CHARACTER_AMY;
+                character_select_active_player = 1;
+            }
+            character_choose(selected_character);
+        }
+
+        if (b)
+        {
+            is_start_game_menu = false;
+            is_main_menu = true;
+            main_menu_idx = 0;
+        }
+
+        last_up = up;
+        last_down = down;
+        last_left = left;
+        last_right = right;
+        last_a = a;
+        last_b = b;
+        last_start = start;
+        return;
+    }
+
+    if (is_character_select)
+    {
+        if (b)
+        {
+            is_character_select = false;
+            is_start_game_menu = true;
+            is_main_menu = false;
+            is_options_menu = false;
+            main_menu_idx = 0;
+            start_game_menu_idx = 0;
+            last_up = up;
+            last_down = down;
+            last_left = left;
+            last_right = right;
+            last_a = a;
+            last_b = b;
+            last_start = start;
+            return;
+        }
+
+        if (is_multiplayer_mode)
+        {
+            if (up_edge || down_edge)
+                character_select_active_player = (character_select_active_player == 1) ? 2 : 1;
+
+            if (up_edge)
+            {
+                if (character_select_active_player == 1)
+                    selected_character_p1 = (selected_character_p1 + CHARACTER_COUNT - 1) % CHARACTER_COUNT;
+                else
+                    selected_character_p2 = (selected_character_p2 + CHARACTER_COUNT - 1) % CHARACTER_COUNT;
+            }
+            else if (down_edge)
+            {
+                if (character_select_active_player == 1)
+                    selected_character_p1 = (selected_character_p1 + 1) % CHARACTER_COUNT;
+                else
+                    selected_character_p2 = (selected_character_p2 + 1) % CHARACTER_COUNT;
+            }
+
+            if (a_edge)
+            {
+                int lines[] = {8, 10, 11, 12};
+                clear_text_lines(lines, 4);
+                draw_text(8, 8, "Multiplayer selection pending implementation.");
+            }
+        }
+        else
+        {
+            if (up_edge)
+            {
+                selected_character = (selected_character + CHARACTER_COUNT - 1) % CHARACTER_COUNT;
+                character_choose(selected_character);
+            }
+            else if (down_edge)
+            {
+                selected_character = (selected_character + 1) % CHARACTER_COUNT;
+                character_choose(selected_character);
+            }
+            else if (a_edge)
+            {
+                int lines[] = {8, 9, 10, 11, 12, 13, 14, 15, 16};
+                clear_text_lines(lines, 9);
+                is_character_select = false;
+                is_game_paused = false;
+                game_started = false;
+                pending_resume_sprite_refresh = false;
+                if (!cache_game_background() && show_debug_overlay)
+                    draw_text(0, 20, "[SONIC] ERRO: Nao foi possivel carregar BG.TGA");
+                loading_phase = 1;
+            }
+        }
+
+        last_up = up;
+        last_down = down;
+        last_left = left;
+        last_right = right;
+        last_a = a;
+        last_b = b;
         last_start = start;
         return;
     }
