@@ -1,0 +1,38 @@
+# Build output folders
+build/
+game_build/
+
+# Compiled object files
+*.o
+*.obj
+
+# Executables and binaries
+*.exe
+*.elf
+*.bin
+*.map
+*.iso
+*.cue
+
+# Cache and temporary files
+*.tmp
+*.log
+*~
+
+# IDE / editor
+.vscode/
+*.code-workspace
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Game engine temp / logs
+*.tga.log
+
+# Avoid committing large binaries or build artifacts
+*.hex
+*.s
+
+# Optional: custom exclude for cartridge build files
+cd/0.bin
